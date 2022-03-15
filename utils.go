@@ -17,7 +17,7 @@ func buildURLParams(userURL string, params map[string]string) (string, error) {
 		mkparams.Set(k, v)
 
 	}
-	Url.RawQuery = mkparams.Encode()
+	Url.RawQuery = Url.RawQuery + mkparams.Encode()
 
 	userURL = Url.String()
 	return userURL, nil
