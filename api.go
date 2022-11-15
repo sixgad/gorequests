@@ -1,6 +1,13 @@
 package gorequests
 
 // 常见几种请求类型
+func Head(origurl string, args ...interface{}) (resp *Response, err error) {
+	req := Requests()
+
+	// call request Head
+	resp, err = req.Send("HEAD", origurl, args...)
+	return resp, err
+}
 func Get(origurl string, args ...interface{}) (resp *Response, err error) {
 	req := Requests()
 

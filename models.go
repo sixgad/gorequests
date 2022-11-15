@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -66,6 +67,7 @@ func Requests() *Request {
 func (req *Request) Send(method string, origurl string, args ...interface{}) (resp *Response, err error) {
 
 	req.httpreq.Method = method
+	thisTransport := &http.Transport{}
 
 	params := map[string]string{}
 	datas := map[string]string{}
@@ -101,14 +103,17 @@ func (req *Request) Send(method string, origurl string, args ...interface{}) (re
 			}
 			req.setBodyRawBytes(ioutil.NopCloser(strings.NewReader(a)))
 		case SetTimeout:
-			req.Client.Timeout = time.Duration(a * SetTimeout(time.Second))
+			// 最容易使用的是http.Client的Timeout字段。它涵盖了从拨号（如果连接不被重用）到读取body的整个交换过程
+			// but大文件下载读取body容易超时
+			// req.Client.Timeout = time.Duration(a * SetTimeout(time.Second))
+			// 修改为限制建立连接超时
+			thisTransport.DialContext = (&net.Dialer{
+				Timeout: time.Duration(a * SetTimeout(time.Second)), //连接超时时间
+			}).DialContext
 		case Proxy:
 			proxy, _ := url.Parse(string(a))
-			tr := &http.Transport{
-				Proxy:           http.ProxyURL(proxy),
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-			req.Client.Transport = tr
+			thisTransport.Proxy = http.ProxyURL(proxy)
+			thisTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		case Cookie:
 			// header里的cookie为最高优先级设置
 			if req.Header.Get("Cookie") == "" {
@@ -120,7 +125,7 @@ func (req *Request) Send(method string, origurl string, args ...interface{}) (re
 		}
 
 	}
-
+	req.Client.Transport = thisTransport
 	disturl, err := buildURLParams(origurl, params)
 	if err != nil {
 		return nil, err
